@@ -1,10 +1,12 @@
 package main
 
 import (
-	"encoding/base64"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -33,7 +35,6 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	fmt.Println("uploading thumbnail for video", videoID, "by user", userID)
 
 	const maxMemory = 10 << 20
-
 	err = r.ParseMultipartForm(maxMemory)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "error parsing multipart form", err)
@@ -48,6 +49,11 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	defer file.Close()
 
 	contentType := header.Header.Get("Content-Type")
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if mediaType != "image/jpg" && mediaType != "image/png" {
+		respondWithError(w, http.StatusInternalServerError, "please upload jpg or png", err)
+		return
+	}
 
 	data, err := io.ReadAll(file)
 	if err != nil {
@@ -66,11 +72,34 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	imgString := base64.StdEncoding.EncodeToString(data)
+	var fileExtension string
 
-	dataUrl := fmt.Sprintf("data:%v;base64,%v", contentType, imgString)
+	if len(contentType) >= 3 {
+		fileExtension = contentType[len(contentType)-3:]
+	} else {
+		respondWithError(w, http.StatusBadRequest, "invalid content type", err)
+		return
+	}
 
-	dbVideo.ThumbnailURL = &dataUrl
+	videoFileName := videoID.String() + "." + fileExtension
+
+	newFilePath := filepath.Join(cfg.assetsRoot, videoFileName)
+
+	newFile, err := os.Create(newFilePath)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "error saving file", err)
+		return
+	}
+
+	_, err = newFile.Write(data)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "error writing new file", err)
+		return
+	}
+
+	newUrl := fmt.Sprintf("http://localhost:%v/%v", cfg.port, newFilePath)
+
+	dbVideo.ThumbnailURL = &newUrl
 
 	err = cfg.db.UpdateVideo(dbVideo)
 	if err != nil {
