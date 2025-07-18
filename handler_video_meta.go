@@ -110,11 +110,12 @@ func (cfg *apiConfig) handlerVideosRetrieve(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	videos, err := cfg.db.GetVideos(userID)
+	dbVideos, err := cfg.db.GetVideos(userID)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't retrieve videos", err)
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, videos)
+	// Return the slice of signed videos
+	respondWithJSON(w, http.StatusOK, dbVideos)
 }

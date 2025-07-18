@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -118,7 +119,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 
 	params := s3.PutObjectInput{
 		Bucket:      &cfg.s3Bucket,
-		Key:         &fileNameString,
+		Key:         aws.String(fileNameString),
 		Body:        fastVideoFile,
 		ContentType: &contentTypeString,
 	}
@@ -129,7 +130,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	newUrl := fmt.Sprintf("https://%v.s3.%v.amazonaws.com/%v", cfg.s3Bucket, cfg.s3Region, fileNameString)
+	newUrl := fmt.Sprintf("%s/%v", cfg.s3CfDistribution, fileNameString)
 
 	dbVideo.VideoURL = &newUrl
 
